@@ -100,6 +100,19 @@ void EventProcessor::KillEvent(BasicEvent* event)
 
 void EventProcessor::AddEvent(BasicEvent* Event, uint64 e_time, bool set_addtime)
 {
+    // Honor the abort contract that KillAllEvents advertises ("prevent event insertions").
+    // While the processor is tearing down (owner being deleted), an event's Execute()/Abort()
+    // can try to re-add itself (e.g. SpellEvent's 3 re-add paths). Inserting into a dying /
+    // just-cleared queue leaves a dangling event that is later executed or double-freed --
+    // the use-after-free crash at SpellEvent::Execute+20. Instead delete the event now; its
+    // virtual destructor (~SpellEvent -> Spell::cancel) performs the proper cleanup. Callers
+    // pass ownership on AddEvent and never touch the event after, so this is safe.
+    if (m_aborting)
+    {
+        delete Event;
+        return;
+    }
+
     if (set_addtime)
         Event->m_addTime = m_time;
 
