@@ -532,8 +532,12 @@ struct SummonThelrinDnd : public SpellScript
         if (effIdx != EFFECT_INDEX_1)
             return;
 
-        Unit* target = spell->GetUnitTarget();
-        instance_blackrock_depths* instance = dynamic_cast<instance_blackrock_depths*>(target->GetInstanceData());
+        // GetUnitTarget() can be null for this effect (same null-deref class as the Thermaplugg
+        // crash); read the instance from the caster, which is always in the BRD instance.
+        Unit* caster = spell->GetCaster();
+        if (!caster)
+            return;
+        instance_blackrock_depths* instance = dynamic_cast<instance_blackrock_depths*>(caster->GetInstanceData());
         if (instance && instance->GetData(TYPE_RING_OF_LAW) != DONE && instance->GetData(TYPE_RING_OF_LAW) != SPECIAL)
             instance->SetData(TYPE_RING_OF_LAW, instance->GetData(TYPE_RING_OF_LAW) == IN_PROGRESS ? uint32(SPECIAL) : uint32(DATA_BANNER_BEFORE_EVENT));
     }

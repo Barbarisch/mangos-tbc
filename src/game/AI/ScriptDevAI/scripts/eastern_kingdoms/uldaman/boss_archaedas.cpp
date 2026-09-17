@@ -191,6 +191,8 @@ struct AwakenVaultWarder : public SpellScript
     void OnEffectExecute(Spell* spell, SpellEffectIndex /*effIdx*/) const override
     {
         Unit* target = spell->GetUnitTarget();
+        if (!target)                    // guard the null-deref class that crashed Thermaplugg
+            return;
         target->RemoveAurasDueToSpell(SPELL_STONED);
 
         ScriptedInstance* instance = static_cast<ScriptedInstance*>(target->GetInstanceData());
