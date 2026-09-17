@@ -250,10 +250,16 @@ struct ActivateBombThermaplugg : public SpellScript
 {
     void OnEffectExecute(Spell* spell, SpellEffectIndex /*effIdx*/) const override
     {
-        Unit* target = spell->GetUnitTarget();
         // This spell should select a random Bomb-Face and activate it if needed
-        // meant to cast commented out spells at random
-        if (instance_gnomeregan* instance = dynamic_cast<instance_gnomeregan*>(target->GetInstanceData()))
+        // meant to cast commented out spells at random.
+        // NB: the bomb-activate spell (11511/11795) is cast on a DESTINATION, so it has NO unit
+        // target -- spell->GetUnitTarget() returns nullptr, and dereferencing it (the old
+        // target->GetInstanceData()) crashed the server with SIGSEGV on the bomb timer ~10-17s into
+        // the fight. Read the instance from the CASTER (Thermaplugg), which is always valid.
+        Unit* caster = spell->GetCaster();
+        if (!caster)
+            return;
+        if (instance_gnomeregan* instance = dynamic_cast<instance_gnomeregan*>(caster->GetInstanceData()))
             instance->DoActivateBombFace(urand(0, MAX_GNOME_FACES - 1));
     }
 };
