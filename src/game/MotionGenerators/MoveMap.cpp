@@ -366,7 +366,11 @@ namespace MMAP
         // allocate mesh query
         dtNavMeshQuery* query = dtAllocNavMeshQuery();
         MANGOS_ASSERT(query);
-        if (dtStatusFailed(query->init(mmap->navMesh, 1024)))
+        // Detour A* search node budget. The stock 1024 is too small for long, winding dungeon paths
+        // (e.g. Ramparts' spiral ramp): the search runs out of nodes and returns a truncated/partial
+        // path, which makes connected regions look disconnected and stalls bots on foot. 8192 lets
+        // those legitimate long paths resolve. (Memory cost is a few hundred KB per loaded map query.)
+        if (dtStatusFailed(query->init(mmap->navMesh, 8192)))
         {
             dtFreeNavMeshQuery(query);
             mmap->navMeshQueries.erase(queryItr);

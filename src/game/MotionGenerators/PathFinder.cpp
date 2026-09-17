@@ -1037,8 +1037,18 @@ void PathFinder::createFilter()
         // perfect support not possible, just stay 'safe'
         if (!m_sourceUnit || ((Player*)m_sourceUnit)->GetPlayerbotAI()) //Blank or bot-navigation
         {
-            includeFlags |= (NAV_GROUND | NAV_WATER);
-            excludeFlags |= (NAV_MAGMA_SLIME | NAV_GROUND_STEEP);
+            // Bots traverse dungeons ON FOOT and must climb the same steep ramps the mobs use --
+            // e.g. Hellfire Ramparts' 50-60 deg spiral ramps, which MoveMapGen meshes as
+            // NAV_AREA_GROUND_STEEP ("Walkable for mobs, unwalkable for players", MapBuilder.cpp:59).
+            // Excluding that flag stranded the bot navigator at the base of the ramp with an
+            // INCOMPLETE path, so the party could never reach the upper packs/bosses without a
+            // teleport crutch. Include NAV_GROUND_STEEP so bots path up steep ground exactly like
+            // creatures do (the creature branch below already includes it). This is bot-only
+            // navigation -- real players move by client input, not the server PathFinder -- so it
+            // does not change human movement. Keep the mob-avoidance area costs so bots still
+            // prefer safe lanes where one exists.
+            includeFlags |= (NAV_GROUND | NAV_WATER | NAV_GROUND_STEEP);
+            excludeFlags |= (NAV_MAGMA_SLIME);
 
             m_filter.setAreaCost(9, 20.0f);  //Water
             m_filter.setAreaCost(12, 5.0f);  //Mob proximity
