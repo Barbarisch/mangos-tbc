@@ -73,8 +73,12 @@ struct CorruptMedivh : public SpellScript
         if (effIdx != EFFECT_INDEX_0)
             return;
 
-        Unit* target = spell->GetUnitTarget();
-        if (instance_dark_portal* instance = dynamic_cast<instance_dark_portal*>(target->GetInstanceData()))
+        // GetUnitTarget() can be null for this effect (same null-deref class as the Thermaplugg
+        // crash); read the instance from the caster, which is always in the instance.
+        Unit* caster = spell->GetCaster();
+        if (!caster)
+            return;
+        if (instance_dark_portal* instance = dynamic_cast<instance_dark_portal*>(caster->GetInstanceData()))
             instance->SetData(TYPE_SHIELD, SPECIAL);
     }
 };
