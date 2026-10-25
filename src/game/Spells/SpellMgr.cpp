@@ -2088,6 +2088,7 @@ void SpellMgr::LoadSpellAreas()
 {
     mSpellAreaMap.clear();                                  // need for reload case
     mSpellAreaForAuraMap.clear();
+    mSpellAreaForAreaMap.clear();                           // LOCAL PATCH (2026-10-25): reload left it pointing into the cleared mSpellAreaMap (ASan)
 
     uint32 count = 0;
 
