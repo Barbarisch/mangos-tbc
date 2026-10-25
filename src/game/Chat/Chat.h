@@ -778,6 +778,7 @@ class ChatHandler
         bool HandleRandomPlayerbotCommand(char* args);
         bool HandleAhBotCommand(char* args);
         bool HandlePerfMonCommand(char* args);
+        bool HandlePlayerCommand(char* args);   // LOCAL PATCH: character profiles, playerbot CharacterProfile.cpp
 #endif
 
         bool HandleArenaFlushPointsCommand(char* args);
