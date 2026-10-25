@@ -208,6 +208,11 @@ class BIH
                             }
                             // ray passes through both nodes
                             // push back node
+                            // LOCAL PATCH (2026-10-25): a NaN ray makes every compare false and
+                            // pushes on every node; stop instead of writing past the stack
+                            // (live crash 10-18, stack write in intersectRay).
+                            if (stackPos >= MAX_STACK_SIZE)
+                                return;
                             stack[stackPos].node = back;
                             stack[stackPos].tnear = (tb >= intervalMin) ? tb : intervalMin;
                             stack[stackPos].tfar = intervalMax;
@@ -302,6 +307,8 @@ class BIH
                             }
                             // point is in both nodes
                             // push back right node
+                            if (stackPos >= MAX_STACK_SIZE)
+                                return;
                             stack[stackPos].node = right;
                             ++stackPos;
                         }
