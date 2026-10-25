@@ -75,15 +75,15 @@ class PlayerbotLoginQueryHolder : public LoginQueryHolder
 {
 private:
     uint32 masterAccountId;
-    PlayerbotHolder* playerbotHolder;
+    ObjectGuid masterGuid;          // whose PlayerbotMgr asked; empty: the random bot manager
 
 public:
-    PlayerbotLoginQueryHolder(PlayerbotHolder* playerbotHolder, uint32 masterAccount, uint32 accountId, uint32 guid)
-        : LoginQueryHolder(accountId, ObjectGuid(HIGHGUID_PLAYER, guid)), masterAccountId(masterAccount), playerbotHolder(playerbotHolder) { }
+    PlayerbotLoginQueryHolder(ObjectGuid masterGuid, uint32 masterAccount, uint32 accountId, uint32 guid)
+        : LoginQueryHolder(accountId, ObjectGuid(HIGHGUID_PLAYER, guid)), masterAccountId(masterAccount), masterGuid(masterGuid) { }
 
 public:
     uint32 GetMasterAccountId() const { return masterAccountId; }
-    PlayerbotHolder* GetPlayerbotHolder() { return playerbotHolder; }
+    ObjectGuid GetMasterGuid() const { return masterGuid; }
 };
 
 void PlayerbotHolder::AddPlayerBot(uint32 playerGuid, uint32 masterAccount)
@@ -99,14 +99,27 @@ void PlayerbotHolder::AddPlayerBot(uint32 playerGuid, uint32 masterAccount)
     if (accountId == 0)
         return;
 
-    PlayerbotLoginQueryHolder* holder = new PlayerbotLoginQueryHolder(this, masterAccount, accountId, playerGuid);
+    // LOCAL PATCH: never keep `this` across the async load. A PlayerbotMgr belongs to its
+    // master and is deleted when the master logs out, and the callback then ran on freed
+    // memory (crash: log out right after `.bot add`). Remember whose manager asked and look
+    // it up again when the load comes back; the random bot manager lives forever.
+    ObjectGuid masterGuid;
+    if (this != &sRandomPlayerbotMgr)
+    {
+        Player* master = static_cast<PlayerbotMgr*>(this)->GetMaster();
+        if (!master)
+            return;
+        masterGuid = master->GetObjectGuid();
+    }
+
+    PlayerbotLoginQueryHolder* holder = new PlayerbotLoginQueryHolder(masterGuid, masterAccount, accountId, playerGuid);
     if (!holder->Initialize())
     {
         delete holder;                                      // delete all unprocessed queries
         return;
     }
 
-    CharacterDatabase.DelayQueryHolder(this, &PlayerbotHolder::HandlePlayerBotLoginCallback, holder);
+    CharacterDatabase.DelayQueryHolder(static_cast<PlayerbotHolder*>(&sRandomPlayerbotMgr), &PlayerbotHolder::HandlePlayerBotLoginCallback, holder);
 }
 
 void PlayerbotHolder::HandlePlayerBotLoginCallback(QueryResult* dummy, SqlQueryHolder* holder)
@@ -117,14 +130,31 @@ void PlayerbotHolder::HandlePlayerBotLoginCallback(QueryResult* dummy, SqlQueryH
     PlayerbotLoginQueryHolder* lqh = (PlayerbotLoginQueryHolder*)holder;
     uint32 masterAccount = lqh->GetMasterAccountId();
 
+    // LOCAL PATCH: the manager that asked, found again now (see AddPlayerBot). This callback
+    // is always called on sRandomPlayerbotMgr.
+    PlayerbotHolder* owner = this;
+    if (lqh->GetMasterGuid())
+    {
+        Player* master = sObjectMgr.GetPlayer(lqh->GetMasterGuid(), false);
+        owner = master ? master->GetPlayerbotMgr() : nullptr;
+        if (!owner)                                         // the master logged out meanwhile
+        {
+            delete lqh;
+            return;
+        }
+    }
+
+    // has bot already been added?
+    if (sObjectMgr.GetPlayer(lqh->GetGuid(), false))
+    {
+        delete lqh;
+        return;
+    }
+
     WorldSession* masterSession = masterAccount ? sWorld.FindSession(masterAccount) : NULL;
     uint32 botAccountId = lqh->GetAccountId();
     WorldSession* botSession = new WorldSession(botAccountId, NULL, SEC_PLAYER, 1, 0, LOCALE_enUS, "", 0, 0, false);
     botSession->SetNoAnticheat();
-
-    // has bot already been added?
-    if (sObjectMgr.GetPlayer(lqh->GetGuid(), false))
-        return;
 
     uint32 guid = lqh->GetGuid().GetRawValue();
 
@@ -146,7 +176,7 @@ void PlayerbotHolder::HandlePlayerBotLoginCallback(QueryResult* dummy, SqlQueryH
     {
         allowed = true;
     }
-    else if (masterSession && sPlayerbotAIConfig.allowGuildBots && bot->GetGuildId() == masterSession->GetPlayer()->GetGuildId())
+    else if (masterSession && masterSession->GetPlayer() && sPlayerbotAIConfig.allowGuildBots && bot->GetGuildId() == masterSession->GetPlayer()->GetGuildId())
     {
         allowed = true;
     }
@@ -157,7 +187,7 @@ void PlayerbotHolder::HandlePlayerBotLoginCallback(QueryResult* dummy, SqlQueryH
 
     if (allowed)
     {
-        OnBotLogin(bot);
+        owner->OnBotLogin(bot);
         return;
     }
 
@@ -167,7 +197,7 @@ void PlayerbotHolder::HandlePlayerBotLoginCallback(QueryResult* dummy, SqlQueryH
         ch.PSendSysMessage("You are not allowed to control bot %s", bot->GetName());
     }
 
-    LogoutPlayerBot(bot->GetObjectGuid());
+    owner->LogoutPlayerBot(bot->GetObjectGuid());
     sLog.outError("Attempt to add not allowed bot %s, please try to reset all random bots", bot->GetName());
 }
 #endif
