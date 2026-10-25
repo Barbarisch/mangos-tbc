@@ -1941,7 +1941,9 @@ void GameObject::Use(Unit* user, SpellEntry const* spellInfo)
             if (spellId == 46841) // sends only spell GO
                 triggeredFlags |= TRIGGERED_OLD_TRIGGERED;
 
-            onSuccess = [&]()
+            // LOCAL PATCH (2026-10-25): capture info by value. It is scoped to this case and
+            // the lambda runs after the switch (ASan stack-use-after-scope, churn fuzzing).
+            onSuccess = [this, info]()
             {
                 AddUse();
 
