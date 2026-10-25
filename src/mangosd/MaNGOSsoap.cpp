@@ -19,6 +19,8 @@
 #include "MaNGOSsoap.h"
 
 #include <string>
+#include <thread>
+#include <chrono>
 
 SOAPThread::SOAPThread(const std::string& host, int port) : m_host(host), m_port(port), m_workerThread(&SOAPThread::Work, this) {}
 
@@ -40,10 +42,21 @@ void SOAPThread::Work()
     soap.recv_timeout = DataTimeout;
     soap.send_timeout = DataTimeout;
 
-    if (soap_bind(&soap, m_host.c_str(), m_port, BackLogSize) < 0)
+    // LOCAL PATCH (2026-10-25): a restart right after a stop found the port still held (the
+    // old process's socket in TIME_WAIT), and exit() from this worker thread ran the static
+    // destructors under the other threads: "terminate ... Dead Reference" (SIGABRT) on start.
+    // Allow address reuse and retry for up to 30 s before giving up.
+    soap.bind_flags = SO_REUSEADDR;
+    int attempt = 0;
+    while (soap_bind(&soap, m_host.c_str(), m_port, BackLogSize) < 0)
     {
-        sLog.outError("MaNGOSsoap: couldn't bind to %s:%d", m_host.c_str(), m_port);
-        exit(-1);
+        if (++attempt >= 30)
+        {
+            sLog.outError("MaNGOSsoap: couldn't bind to %s:%d", m_host.c_str(), m_port);
+            exit(-1);
+        }
+        sLog.outError("MaNGOSsoap: %s:%d busy, retrying (%d)", m_host.c_str(), m_port, attempt);
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
     sLog.outString("MaNGOSsoap: bound to http://%s:%d", m_host.c_str(), m_port);
