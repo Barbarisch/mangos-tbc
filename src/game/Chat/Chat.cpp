@@ -270,17 +270,19 @@ ChatCommand* ChatHandler::getCommandTable()
         { "visibility",     SEC_MODERATOR,      false, nullptr,                                             "", debugVisibilityCommandTable },
         { "perf",           SEC_ADMINISTRATOR,  false, nullptr,                                             "", debugPerformanceCommandTable },
         { "utf8overflow",   SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleDebugOverflowCommand,            "", nullptr },
-        { "chatfreeze",     SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleDebugChatFreezeCommand,          "", nullptr },
-        { "opcodeouthistory",SEC_ADMINISTRATOR, true,  &ChatHandler::HandleDebugOutPacketHistory,           "", nullptr },
-        { "opcodeinchistory",SEC_ADMINISTRATOR, true,  &ChatHandler::HandleDebugIncPacketHistory,           "", nullptr },
-        { "transports",     SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleDebugTransports,                 "", nullptr },
+        // LOCAL PATCH (2026-10-25): chatfreeze..dbscriptguided below read the session
+        // player, which the console and SOAP do not have (null deref, found by fuzzing).
+        { "chatfreeze",     SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugChatFreezeCommand,          "", nullptr },
+        { "opcodeouthistory",SEC_ADMINISTRATOR, false, &ChatHandler::HandleDebugOutPacketHistory,           "", nullptr },
+        { "opcodeinchistory",SEC_ADMINISTRATOR, false, &ChatHandler::HandleDebugIncPacketHistory,           "", nullptr },
+        { "transports",     SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugTransports,                 "", nullptr },
         { "spawn",          SEC_GAMEMASTER,     true,  nullptr,                                             "", debugSpawnsCommandtable },
         { "debugflags",     SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleDebugObjectFlags,                "", nullptr },
-        { "packetlog",      SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleDebugPacketLog,                  "", nullptr },
-        { "dbscript",       SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleDebugDbscript,                   "", nullptr },
-        { "dbscripttargeted", SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleDebugDbscriptTargeted,         "", nullptr },
-        { "dbscriptsourced", SEC_ADMINISTRATOR, true,  &ChatHandler::HandleDebugDbscriptSourced,            "", nullptr },
-        { "dbscriptguided", SEC_ADMINISTRATOR,  true,  &ChatHandler::HandleDebugDbscriptGuided,             "", nullptr },
+        { "packetlog",      SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugPacketLog,                  "", nullptr },
+        { "dbscript",       SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugDbscript,                   "", nullptr },
+        { "dbscripttargeted", SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugDbscriptTargeted,         "", nullptr },
+        { "dbscriptsourced", SEC_ADMINISTRATOR, false, &ChatHandler::HandleDebugDbscriptSourced,            "", nullptr },
+        { "dbscriptguided", SEC_ADMINISTRATOR,  false, &ChatHandler::HandleDebugDbscriptGuided,             "", nullptr },
         { nullptr,          0,                  false, nullptr,                                             "", nullptr }
     };
 
