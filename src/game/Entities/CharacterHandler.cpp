@@ -274,10 +274,11 @@ class CharacterHandler
             }
 
             ObjectGuid guid = ((LoginQueryHolder*)holder)->GetGuid();
+            Player* before = session->GetPlayer();
             session->HandlePlayerLogin((LoginQueryHolder*)holder);
 
             Player* player = session->GetPlayer();
-            if (player)
+            if (player && player != before)                 // LOCAL PATCH: not when the login was refused
             {
                 player->CreatePlayerbotMgr();
                 player->GetPlayerbotMgr()->OnPlayerLogin(player);
@@ -798,6 +799,26 @@ void PlayerbotMgr::LoginPlayerBot(ObjectGuid playerGuid)
 void WorldSession::HandlePlayerLogin(LoginQueryHolder* holder)
 {
     ObjectGuid playerGuid = holder->GetGuid();
+
+    // LOCAL PATCH (2026-10-26): the checks in HandlePlayerLoginOpcode ran when the login was
+    // queued. Meanwhile the character may have been loaded (a bot added with .bot add, or a
+    // second login request on this session), and loading it again made a second Player: the
+    // first stayed on its map, out of the object accessor, pointing at this session
+    // (stress runs 24-27: session freed under Map::Update, null session player, items of
+    // the second copy "can't be loaded to inventory"). Refuse; a retry takes the loaded
+    // character over or reconnects to it.
+    Player* loaded = ObjectAccessor::FindPlayer(playerGuid, false);
+    if (loaded || _player)
+    {
+        sLog.outError("HandlePlayerLogin> %s not loaded again: %s, AccountId = %u", playerGuid.GetString().c_str(),
+            loaded ? (loaded->GetPlayerbotAI() ? "it is online as a bot" : "it is already loaded") : "this session already has a character",
+            GetAccountId());
+        delete holder;
+        WorldPacket data(SMSG_CHARACTER_LOGIN_FAILED, 1);
+        data << (uint8)CHAR_LOGIN_DUPLICATE_CHARACTER;
+        SendPacket(data, true);
+        return;
+    }
 
     Player* pCurrChar = new Player(this);
     SetPlayer(pCurrChar, playerGuid);
