@@ -2234,6 +2234,21 @@ void World::UpdateSessions(uint32 diff)
                 if (p->GetSession() == pSession)
                     users.push_back(std::string(p->GetName()) + (p->IsInWorld() ? " (in world)" : ""));
             });
+            // ... and on any map: a player can be on a map without being in the object accessor
+            // (ASan: Map::Update -> WorldSession::UpdateMap after this delete, stress runs 24 and
+            // 26, with nobody found above). Map threads are idle here.
+            sMapMgr.DoForAllMaps([&](Map* map)
+            {
+                for (auto const& ref : map->GetPlayers())
+                {
+                    Player* p = ref.getSource();
+                    if (p && p->GetSession() == pSession)
+                        users.push_back(std::string(p->GetName()) + " on map " + std::to_string(map->GetId()) +
+                            (p->IsInWorld() ? " in world" : "") +
+                            (sObjectAccessor.FindPlayer(p->GetObjectGuid(), false) == p ? "" : ", not in the accessor") +
+                            (p->GetPlayerbotAI() ? ", has bot AI" : ""));
+                }
+            });
             if (!users.empty())
             {
                 static std::set<WorldSession*> s_kept;      // logged once per session
