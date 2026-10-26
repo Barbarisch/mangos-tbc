@@ -81,7 +81,23 @@ class ChatHandler
         explicit ChatHandler(Player* player);
         virtual ~ChatHandler();
 
-        static char* LineFromMessage(char*& pos) { char* start = strtok(pos, "\n"); pos = nullptr; return start; }
+        // LOCAL PATCH (2026-10-26): no strtok, its hidden position is shared by all threads
+        // (bots send system messages from map threads)
+        static char* LineFromMessage(char*& pos)
+        {
+            while (pos && *pos == '\n')
+                ++pos;
+            if (!pos || !*pos)
+            {
+                pos = nullptr;
+                return nullptr;
+            }
+            char* start = pos;
+            pos = strchr(pos, '\n');
+            if (pos)
+                *pos++ = '\0';
+            return start;
+        }
 
         // function with different implementation for chat/console
         virtual const char* GetMangosString(int32 entry) const;

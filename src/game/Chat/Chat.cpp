@@ -2479,9 +2479,13 @@ char* ChatHandler::ExtractLiteralArg(char** args, char const* lit /*= nullptr*/)
         return arg;
     }
 
-    char* name = strtok(head, " ");
+    // LOCAL PATCH (2026-10-26): strtok_r; strtok's hidden position is shared by all threads
+    // and bots parse links on every map thread at once (ASan: ExtractLiteralArg reading
+    // another thread's stack, stress run 24)
+    char* save = nullptr;
+    char* name = strtok_r(head, " ", &save);
 
-    char* tail = strtok(nullptr, "");
+    char* tail = strtok_r(nullptr, "", &save);
 
     *args = tail ? tail : (char*)"";                        // *args don't must be nullptr
 

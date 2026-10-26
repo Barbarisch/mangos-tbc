@@ -1796,7 +1796,7 @@ namespace MaNGOS
                     do_helper(data_list, (char*)text);
             }
         private:
-            char* lineFromMessage(char*& pos) const { char* start = strtok(pos, "\n"); pos = nullptr; return start; }
+            char* lineFromMessage(char*& pos) const { return ChatHandler::LineFromMessage(pos); }
             void do_helper(WorldPacketList& data_list, char* text)
             {
                 char* pos = text;
