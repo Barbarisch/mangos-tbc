@@ -1733,6 +1733,9 @@ void Map::RemoveObjectFromRemoveList(WorldObject* obj)
 {
     i_objectsToRemove.erase(obj);
     obj->m_inRemoveList = false;
+    // LOCAL PATCH (2026-10-26): CleanupsBeforeDelete left its events aborting for good; a
+    // respawned creature's spells were then thrown away (and crashed, stress run 23)
+    obj->m_events.ResetAborting();
 }
 
 bool Map::IsInRemoveList(WorldObject* obj) const

@@ -72,6 +72,8 @@ class EventProcessor
         uint64 CalculateTime(uint64 t_offset) const;
         EventList& GetEvents() { return m_events; }
         bool IsEmpty() const { return m_events.empty(); }
+        // LOCAL PATCH (2026-10-26): an object taken back out of its map's remove list lives on
+        void ResetAborting() { m_aborting = false; }
 
     protected:
 

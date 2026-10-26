@@ -105,13 +105,13 @@ void EventProcessor::AddEvent(BasicEvent* Event, uint64 e_time, bool set_addtime
     // can try to re-add itself (e.g. SpellEvent's 3 re-add paths). Inserting into a dying /
     // just-cleared queue leaves a dangling event that is later executed or double-freed --
     // the use-after-free crash at SpellEvent::Execute+20. Instead delete the event now; its
-    // virtual destructor (~SpellEvent -> Spell::cancel) performs the proper cleanup. Callers
-    // pass ownership on AddEvent and never touch the event after, so this is safe.
+    // virtual destructor (~SpellEvent -> Spell::cancel) performs the proper cleanup.
+    // LOCAL PATCH (2026-10-26): not deleted here after all: Spell::SpellStart keeps using its
+    // spell right after AddEvent (ASan: heap-use-after-free in SpellStart, stress run 23).
+    // Queue it already aborted instead: it never executes; Update() aborts and deletes it,
+    // or the destructor's KillAllEvents does.
     if (m_aborting)
-    {
-        delete Event;
-        return;
-    }
+        Event->to_Abort = true;
 
     if (set_addtime)
         Event->m_addTime = m_time;
