@@ -950,7 +950,9 @@ void ObjectMgr::LoadCreatureClassLvlStats()
 
 CreatureClassLvlStats const* ObjectMgr::GetCreatureClassLvlStats(uint32 level, uint32 unitClass, int32 expansion) const
 {
-    if (expansion < 0)
+    // LOCAL PATCH (2026-10-26): pets of players above the creature level cap (GM-set levels)
+    // read past the table (ASan: Pet::InitStatsForLevel, stress run 21)
+    if (expansion < 0 || expansion > MAX_EXPANSION || level > DEFAULT_MAX_CREATURE_LEVEL || unitClass >= MAX_CLASSES)
         return nullptr;
 
     CreatureClassLvlStats const* cCLS = &m_creatureClassLvlStats[level][classToIndex[unitClass]][expansion];

@@ -266,14 +266,18 @@ uint32 Group::RemoveInvite(Player* player)
 {
     m_invitees.erase(player);
 
-    player->SetGroupInvite(nullptr);
+    // LOCAL PATCH (2026-10-26): only our own invite; clearing another group's left that group
+    // holding the player after logout (see _addMember)
+    if (player->GetGroupInvite() == this)
+        player->SetGroupInvite(nullptr);
     return GetMembersCount();
 }
 
 void Group::RemoveAllInvites()
 {
     for (auto m_invitee : m_invitees)
-        m_invitee->SetGroupInvite(nullptr);
+        if (m_invitee->GetGroupInvite() == this)
+            m_invitee->SetGroupInvite(nullptr);
 
     m_invitees.clear();
 }
@@ -841,7 +845,12 @@ bool Group::_addMember(ObjectGuid guid, const char* name, bool isAssistant, uint
 
     if (player)
     {
-        player->SetGroupInvite(nullptr);
+        // LOCAL PATCH (2026-10-26): withdraw a pending invite properly. Clearing only the
+        // pointer left the inviting group's m_invitees holding the player; after logout its
+        // Disband wrote to the freed Player (ASan: Group::RemoveAllInvites, stress run 21).
+        // Bots add members directly (.bot group / .rndbot group) while invites are pending.
+        if (Group* invitedTo = player->GetGroupInvite())
+            invitedTo->RemoveInvite(player);
         // if player is in group and he is being added to BG raid group, then call SetBattleGroundRaid()
         if (player->GetGroup() && IsBattleGroup())
             player->SetBattleGroundRaid(this, group);
