@@ -660,9 +660,28 @@ void WorldSession::HandlePlayerLoginOpcode(WorldPacket& recv_data)
     }
 
 #ifdef ENABLE_PLAYERBOTS
+    // LOCAL PATCH (2026-10-26): logging in to a character that is online as a bot takes the
+    // bot over. Not while this session still has another character (e.g. one in its 20 s
+    // logout): SetPlayer overwrote it, and that character kept pointing at this session
+    // after it was deleted (ASan: Map::Update -> WorldSession::UpdateMap, stress test).
+    if (pCurrChar && pCurrChar->GetPlayerbotAI() && _player && _player != pCurrChar)
+    {
+        sLog.outError("HandlePlayerLoginOpcode> %s is online as a bot while %s is still logged in, AccountId = %u",
+            pCurrChar->GetGuidStr().c_str(), _player->GetGuidStr().c_str(), GetAccountId());
+        data << (uint8)CHAR_LOGIN_DUPLICATE_CHARACTER;
+        SendPacket(data, true);
+        return;
+    }
+
     if (pCurrChar && pCurrChar->GetPlayerbotAI())
     {
         WorldSession* botSession = pCurrChar->GetSession();
+        // LOCAL PATCH (2026-10-26): the player whose PlayerbotMgr holds this bot (an alt added
+        // with .bot add) kept driving it through this, now real, session; hand it over below.
+        Player* oldMaster = pCurrChar->GetPlayerbotAI()->GetMaster();
+        PlayerbotMgr* oldMgr = (oldMaster && oldMaster != pCurrChar) ? oldMaster->GetPlayerbotMgr() : nullptr;
+        if (oldMgr && !oldMgr->GetPlayerBot(playerGuid.GetCounter()))
+            oldMgr = nullptr;
         SetPlayer(pCurrChar, playerGuid);
         _player->SetSession(this);
         _logoutTime = time(0);
@@ -680,6 +699,10 @@ void WorldSession::HandlePlayerLoginOpcode(WorldPacket& recv_data)
             if (sRandomPlayerbotMgr.GetPlayerBot(playerGuid))
             {
                 sRandomPlayerbotMgr.MovePlayerBot(playerGuid, _player->GetPlayerbotMgr());
+            }
+            else if (oldMgr)
+            {
+                oldMgr->MovePlayerBot(playerGuid.GetCounter(), _player->GetPlayerbotMgr());
             }
             else
             {
