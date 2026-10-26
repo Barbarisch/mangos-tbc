@@ -737,6 +737,20 @@ void WorldSession::HandlePlayerLoginOpcode(WorldPacket& recv_data)
             while (_player && _player->IsBeingTeleportedFar())
                 HandleMoveWorldportAckOpcode();
 
+        // LOCAL PATCH (2026-10-26): a far teleport that could not land (e.g. sent back from a
+        // locked instance, which turns into a near teleport waiting for an ack) leaves the
+        // character outside the world; reconnecting then built the client's view from an
+        // unloaded grid (SIGSEGV in Map::CreatePlayerOnClient, stress test). Let its logout
+        // finish; logging in after that loads it normally.
+        if (!_player || !_player->IsInWorld())
+        {
+            sLog.outError("HandlePlayerLoginOpcode> %s is not in the world, cannot reconnect yet, AccountId = %u",
+                pCurrChar->GetGuidStr().c_str(), GetAccountId());
+            data << (uint8)CHAR_LOGIN_FAILED;
+            SendPacket(data, true);
+            return;
+        }
+
         // release loot on reconnect
         if (Loot* loot = sLootMgr.GetLoot(_player))
             loot->Release(_player);
