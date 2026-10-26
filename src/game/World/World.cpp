@@ -30,6 +30,7 @@
 #include "Server/WorldSession.h"
 #include "Server/WorldPacket.h"
 #include "Entities/Player.h"
+#include "Globals/ObjectAccessor.h"
 #include "Skills/SkillExtraItems.h"
 #include "Skills/SkillDiscovery.h"
 #include "Accounts/AccountMgr.h"
@@ -2216,6 +2217,37 @@ void World::UpdateSessions(uint32 diff)
 
         if (!pSession->Update(diff))
         {
+            // LOCAL PATCH (2026-10-26): never delete a session a player in the world still
+            // points at; the map would keep updating that player through it (ASan:
+            // Map::Update -> WorldSession::UpdateMap after this delete). Log its own player
+            // out first; if some other player still uses it (a character taken over from a
+            // bot), keep the session and say so: a small leak instead of a crash.
+            if (pSession->GetPlayer())
+            {
+                sLog.outError("SESSION: account %u (state %u) ended with %s still loaded; logging it out first",
+                    pSession->GetAccountId(), uint32(pSession->GetState()), pSession->GetPlayer()->GetName());
+                pSession->LogoutPlayer();
+            }
+            std::vector<std::string> users;
+            sObjectAccessor.ExecuteOnAllPlayers([&](Player* p)
+            {
+                if (p->GetSession() == pSession)
+                    users.push_back(std::string(p->GetName()) + (p->IsInWorld() ? " (in world)" : ""));
+            });
+            if (!users.empty())
+            {
+                static std::set<WorldSession*> s_kept;      // logged once per session
+                if (s_kept.insert(pSession).second)
+                {
+                    std::string names;
+                    for (const auto& n : users)
+                        names += (names.empty() ? "" : ", ") + n;
+                    sLog.outError("SESSION: account %u (state %u) ended but is still used by %s; keeping it",
+                        pSession->GetAccountId(), uint32(pSession->GetState()), names.c_str());
+                }
+                ++itr;
+                continue;
+            }
             RemoveQueuedSession(pSession);
             itr = m_sessions.erase(itr);
             delete pSession;
