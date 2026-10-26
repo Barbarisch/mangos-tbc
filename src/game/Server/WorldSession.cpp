@@ -515,6 +515,20 @@ bool WorldSession::Update(uint32 /*diff*/)
             // TODO:: Maybe check if have to send queue update?
             if (!m_socket || (m_socket && m_socket->IsClosed()))
             {
+                // LOCAL PATCH (2026-10-26): a character whose login finished after the socket
+                // closed is in the world, but SetOnline() refused (socket closed), so the
+                // session is still here. Deleting it left the player on its map with a dangling
+                // session (ASan: Map::Update -> WorldSession::UpdateMap after UpdateSessions
+                // deleted it; client dropped during the loading screen). Wait for a load in
+                // progress, and log a loaded player out through the offline path.
+                if (m_playerLoading)
+                    return true;
+                if (_player)
+                {
+                    SetOffline();
+                    return true;
+                }
+
                 // directly remove this session
                 return false;
             }
