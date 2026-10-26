@@ -616,13 +616,21 @@ void WorldSession::UpdateMap(uint32 diff)
 #ifdef ENABLE_PLAYERBOTS
 void WorldSession::HandleBotPackets()
 {
-    while (!m_recvQueue.empty())
+    // LOCAL PATCH (2026-10-26): bot AI queues packets from map threads (QueuePacket takes
+    // m_recvQueueLock); pop under the same lock.
+    while (true)
     {
+        std::unique_ptr<WorldPacket> packet;
+        {
+            std::lock_guard<std::mutex> guard(m_recvQueueLock);
+            if (m_recvQueue.empty())
+                break;
+            packet = std::move(m_recvQueue.front());
+            m_recvQueue.pop_front();
+        }
+
         if (_player)
             _player->SetCanDelayTeleport(true);
-
-        auto const packet = std::move(m_recvQueue.front());
-        m_recvQueue.pop_front();
         OpcodeHandler const& opHandle = opcodeTable[packet->GetOpcode()];
         (this->*opHandle.handler)(*packet);
 
