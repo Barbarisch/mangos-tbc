@@ -764,7 +764,16 @@ void WorldSession::LogoutPlayer()
 
         ///- Leave all channels before player delete...
         _player->CleanupChannels();
-        
+
+#ifdef ENABLE_PLAYERBOTS
+        // LOCAL PATCH (2026-10-26): the block below is skipped with bots, which also skipped
+        // dropping a pending invite; the group kept the deleted player in m_invitees and the
+        // next uninvite by name read it (ASan: Group::GetInvited, stress run 16). Drop only
+        // the invite; group membership stays as the bots build wants it.
+        if (Group* invitedTo = _player->GetGroupInvite())
+            invitedTo->RemoveInvite(_player);
+#endif
+
 #ifndef ENABLE_PLAYERBOTS
         ///- If the player is in a group (or invited), remove him. If the group if then only 1 person, disband the group.
         _player->UninviteFromGroup();
