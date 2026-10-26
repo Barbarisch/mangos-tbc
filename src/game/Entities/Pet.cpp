@@ -2256,6 +2256,10 @@ void Pet::CastPetAuras(bool current)
         return;
 
     Unit* owner = GetOwner();
+    // LOCAL PATCH (2026-10-26): a pet loading for an owner who is out of the world (summon
+    // finishing mid-teleport) finds no owner (SIGSEGV here, stress run 22)
+    if (!owner)
+        return;
 
     for (PetAuraSet::const_iterator itr = owner->m_petAuras.begin(); itr != owner->m_petAuras.end();)
     {
