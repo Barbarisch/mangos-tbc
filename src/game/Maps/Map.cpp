@@ -488,6 +488,18 @@ void Map::CreatePlayerOnClient(Player* player)
     SendInitInfiniteObjects(player, updateData);
 
     NGridType* grid = getNGrid(cell.GridX(), cell.GridY());
+    // LOCAL PATCH (2026-10-27): reconnecting to a character whose position is in a grid that
+    // is not loaded (a teleport left unfinished by a logout, then a reconnect within the
+    // grace period) dereferenced a null grid (SIGSEGV here, stress runs 20 and 102). Load it,
+    // and say so: the position and the grid the character is in have come apart.
+    if (!grid || !isGridObjectDataLoaded(cell.GridX(), cell.GridY()))
+    {
+        sLog.outError("Map::CreatePlayerOnClient: %s at %.1f %.1f %.1f map %u in an unloaded grid [%u,%u] (in world %u, near tele %u, far tele %u); loading it",
+            player->GetGuidStr().c_str(), player->GetPositionX(), player->GetPositionY(), player->GetPositionZ(), GetId(),
+            cell.GridX(), cell.GridY(), uint32(player->IsInWorld()), uint32(player->IsBeingTeleportedNear()), uint32(player->IsBeingTeleportedFar()));
+        EnsureGridLoaded(cell);
+        grid = getNGrid(cell.GridX(), cell.GridY());
+    }
     player->GetViewPoint().Event_AddedToWorld(&(*grid)(cell.CellX(), cell.CellY()), &updateData);
     AddUpdateCreateObject(player);
 
