@@ -4483,10 +4483,11 @@ void Player::BuildPlayerRepop()
         SpawnCorpseBones();
     }
 
-    if (!GetCorpse())
+    Corpse* corpse = GetCorpse();
+    if (!corpse)
     {
         // create a corpse and place it at the player's location
-        Corpse* corpse = CreateCorpse();
+        corpse = CreateCorpse();
         if (!corpse)
         {
             sLog.outError("Error creating corpse for Player %s [%u]", GetName(), GetGUIDLow());
