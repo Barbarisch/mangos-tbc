@@ -680,10 +680,15 @@ void WorldSession::LogoutPlayer()
         sLog.outChar("Account: %d (IP: %s) Logout Character:[%s] (guid: %u)", GetAccountId(), GetRemoteAddress().c_str(), _player->GetName(), _player->GetGUIDLow());
 #endif
 
-        if (Loot* loot = sLootMgr.GetLoot(_player))
-            loot->Release(_player);
+        // LOCAL PATCH (2026-10-27): a character outside the world (a far teleport that could
+        // not land) has no map; the loot lookup and the graveyard teleport below both asked
+        // for it (GetMap(): m_currMap assert from LootMgr::GetLoot in TeleportTo, release
+        // soak). It is saved dead where it is and its corpse is there at the next login.
+        if (_player->IsInWorld())
+            if (Loot* loot = sLootMgr.GetLoot(_player))
+                loot->Release(_player);
 
-        if (_player->GetDeathTimer())
+        if (_player->GetDeathTimer() && _player->IsInWorld())
         {
             _player->getHostileRefManager().deleteReferences();
             _player->BuildPlayerRepop();
