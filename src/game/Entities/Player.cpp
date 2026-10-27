@@ -4473,20 +4473,27 @@ void Player::BuildPlayerRepop()
     // there we must send 888 opcode
 
     // the player cannot have a corpse already, only bones which are not returned by GetCorpse
+    // LOCAL PATCH (2026-10-27): was MANGOS_ASSERT, which shut the server down. A corpse is
+    // left over when a resurrection's SpawnCorpseBones could not convert it (corpse on another
+    // map or an unloaded grid), and the player then dies and releases again (release fuzz run
+    // 104). Turn it into bones; if it is still there, keep it as this death's corpse.
     if (GetCorpse())
     {
-        sLog.outError("BuildPlayerRepop: player %s(%d) already has a corpse", GetName(), GetGUIDLow());
-        MANGOS_ASSERT(false);
+        sLog.outError("BuildPlayerRepop: player %s(%d) already has a corpse; turning it into bones", GetName(), GetGUIDLow());
+        SpawnCorpseBones();
     }
 
-    // create a corpse and place it at the player's location
-    Corpse* corpse = CreateCorpse();
-    if (!corpse)
+    if (!GetCorpse())
     {
-        sLog.outError("Error creating corpse for Player %s [%u]", GetName(), GetGUIDLow());
-        return;
+        // create a corpse and place it at the player's location
+        Corpse* corpse = CreateCorpse();
+        if (!corpse)
+        {
+            sLog.outError("Error creating corpse for Player %s [%u]", GetName(), GetGUIDLow());
+            return;
+        }
+        GetMap()->Add(corpse);
     }
-    GetMap()->Add(corpse);
 
     // convert player body to ghost
     SetHealth(1);
