@@ -667,6 +667,12 @@ Player::~Player()
 {
     CleanupsBeforeDelete();
 
+    // LOCAL PATCH (2026-10-27): spells still being cast survive CleanupsBeforeDelete and were
+    // destroyed by ~WorldObject, after the items below; a spell cast from an item then wrote
+    // to the freed item (ASan: Item::SetUsedInSpell from ~Spell, bot logged out mid item use,
+    // fuzz run 101). Drop them while the items still exist.
+    m_events.KillAllEvents(true);
+
     // it must be unloaded already in PlayerLogout and accessed only for loggined player
     // m_social = nullptr;
 
