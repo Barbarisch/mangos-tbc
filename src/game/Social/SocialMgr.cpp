@@ -17,6 +17,7 @@
  */
 
 #include "Social/SocialMgr.h"
+#include "Log/Log.h"
 #include "Policies/Singleton.h"
 #include "Database/DatabaseEnv.h"
 #include "Server/Opcodes.h"
@@ -310,6 +311,9 @@ PlayerSocial* SocialMgr::LoadFromDB(std::unique_ptr<QueryResult> queryResult, Ob
 {
     PlayerSocial* social = &m_socialMap[guid.GetCounter()];
     social->SetPlayerGuid(guid);
+    if (social->m_holders++)
+        sLog.outError("SocialMgr::LoadFromDB: %s loaded while another Player object of it still holds its social list (%u holders)",
+            guid.GetString().c_str(), social->m_holders);
 
     if (!queryResult)
         return social;

@@ -138,6 +138,8 @@ class PlayerSocial
     private:
         PlayerSocialMap m_playerSocialMap;
         uint32 m_playerLowGuid;
+        // LOCAL PATCH (2026-11-08): Player objects holding this entry (see RemovePlayerSocial)
+        uint32 m_holders = 0;
 };
 
 class SocialMgr
@@ -146,7 +148,16 @@ class SocialMgr
         SocialMgr();
         ~SocialMgr();
         // Misc
-        void RemovePlayerSocial(uint32 guid) { m_socialMap.erase(guid); }
+        // LOCAL PATCH (2026-11-08): two Player objects of one character (a bot login or a
+        // re-login while the old object is still logging out) share this map's entry. The
+        // first logout erased it and the other Player kept a dangling m_social: SIGSEGV in
+        // GetFriendInfo from LogoutPlayer (stress runs 31 and 107). Erase on the last holder.
+        void RemovePlayerSocial(uint32 guid)
+        {
+            SocialMap::iterator itr = m_socialMap.find(guid);
+            if (itr != m_socialMap.end() && (itr->second.m_holders <= 1 || --itr->second.m_holders == 0))
+                m_socialMap.erase(itr);
+        }
 
         void GetFriendInfo(Player* player, uint32 friend_lowguid, FriendInfo& friendInfo) const;
         // Packet management
