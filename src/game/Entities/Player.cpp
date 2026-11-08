@@ -1459,6 +1459,13 @@ void Player::Update(const uint32 diff)
     if (IsHasDelayedTeleport() && m_semaphoreTeleport_Near)
         TeleportTo(m_teleport_dest, m_teleport_options);
 
+    // LOCAL PATCH (2026-11-08): the delayed teleport above can be a far one (a near teleport
+    // followed by a far one before this update); it removes the player from its map, and the
+    // rest of this update then asserted in GetTerrain() via GetZoneAndAreaId (stress runs 106
+    // and 109, back-to-back GM teleports). Nothing below may run off the map.
+    if (!IsInWorld() || !FindMap())
+        return;
+
     time_t now = time(nullptr);
 
     UpdatePvPFlagTimer(diff);
