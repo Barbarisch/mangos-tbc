@@ -897,6 +897,23 @@ void Map::Update(const uint32& t_diff)
     for (m_mapRefIter = m_mapRefManager.begin(); m_mapRefIter != m_mapRefManager.end(); ++m_mapRefIter)
     {
         Player* plr = m_mapRefIter->getSource();
+        // LOCAL PATCH (2026-11-08): a player in this map's list, in world, with no map at all
+        // stopped the server in Player::Update -> GetZoneAndAreaId -> GetTerrain() assert
+        // (stress run 106, during GM teleports into Shattered Halls). Mid far-teleport it is
+        // skipped (the worldport ack puts it on its new map); otherwise it is put back on this
+        // map. Logged either way, to find how it got there.
+        if (plr && plr->IsInWorld() && plr->FindMap() != this)
+        {
+            bool teleporting = plr->IsBeingTeleportedFar();
+            sLog.outError("Map::Update: %s is in the list of map %u/%u but its map is %s (map id %u/%u, far tele %u, near tele %u, at %.1f %.1f %.1f); %s",
+                plr->GetGuidStr().c_str(), GetId(), GetInstanceId(), plr->FindMap() ? "another map" : "null",
+                plr->GetMapId(), plr->GetInstanceId(), uint32(teleporting), uint32(plr->IsBeingTeleportedNear()),
+                plr->GetPositionX(), plr->GetPositionY(), plr->GetPositionZ(),
+                teleporting || plr->FindMap() || plr->GetMapId() != GetId() ? "skipped" : "put back on this map");
+            if (teleporting || plr->FindMap() || plr->GetMapId() != GetId())
+                continue;
+            plr->SetMap(this);
+        }
         if (plr && plr->IsInWorld())
         {
 #ifdef ENABLE_PLAYERBOTS

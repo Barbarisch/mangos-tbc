@@ -1096,6 +1096,7 @@ class WorldObject : public Object
 
         void SetMap(Map* map);
         Map* GetMap() const { MANGOS_ASSERT(m_currMap); return m_currMap; }
+        Map* FindMap() const { return m_currMap; }          // LOCAL PATCH: GetMap() without the assert
         // used to check all object's GetMap() calls when object is not in world!
         virtual void ResetMap() { m_currMap = nullptr; }
 
